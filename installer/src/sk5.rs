@@ -264,8 +264,42 @@ pub fn status_print() {
     }
 }
 
-/// 猜测对外 IP,仅用于展示连接信息。
+/// 展示用对外 IP:优先查公网回显服务(NAT VPS 本机地址是内网 IP),
+/// 查不到时回退本机路由出口地址。
 pub fn detect_ip() -> String {
+    if let Some(ip) = public_ip() {
+        return ip;
+    }
+    local_ip()
+}
+
+/// 通过外部 HTTPS 回显服务查询公网 IP,响应必须是合法 IP 才采信。
+fn public_ip() -> Option<String> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(10))
+        .build();
+    for url in [
+        "https://ipv4.icanhazip.com",
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+    ] {
+        let resp = match agent.get(url).set("User-Agent", "curl/8").call() {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        if let Ok(text) = resp.into_string() {
+            let t = text.trim().to_string();
+            if t.parse::<std::net::IpAddr>().is_ok() {
+                return Some(t);
+            }
+        }
+    }
+    None
+}
+
+/// 本机路由出口地址(直连型 VPS 等价于公网 IP)。
+fn local_ip() -> String {
     let route = exec::probe("ip", &["-4", "route", "get", "1.1.1.1"]);
     if let Some(idx) = route.find(" src ") {
         let rest = &route[idx + 5..];
