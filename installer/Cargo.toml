@@ -1,0 +1,14 @@
+[package]
+name = "sk5-installer"
+description = "sk5 一键安装器 — SOCKS5 代理 + BBR(魔改) 加速自动部署"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sk5-install"
+path = "src/main.rs"
+
+[dependencies]
+# 唯一外部依赖:自带 rustls,无需系统 openssl/curl
+ureq = "2"

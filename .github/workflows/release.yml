@@ -1,0 +1,56 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # musl 静态链接,Linux 任意发行版可直接运行
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # cross 提供 musl/aarch64 交叉编译的完整工具链(ring 等 C 依赖也能编)
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Build
+        run: cross build --release --workspace --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          arch="${TARGET%%-*}"  # x86_64 / aarch64
+          cd "target/${TARGET}/release"
+          strip sk5-server sk5-install 2>/dev/null || true
+          cp sk5-server "sk5-server-${arch}"
+          cp sk5-install "sk5-install-${arch}"
+        env:
+          TARGET: ${{ matrix.target }}
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/${{ matrix.target }}/release/sk5-server-*
+            target/${{ matrix.target }}/release/sk5-install-*
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace

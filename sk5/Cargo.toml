@@ -1,0 +1,10 @@
+[package]
+name = "sk5"
+description = "sk5-server — 轻量 SOCKS5 代理服务端(零第三方依赖)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sk5-server"
+path = "src/main.rs"
