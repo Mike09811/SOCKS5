@@ -37,6 +37,8 @@ pub fn try_download(ctx: &Ctx, urls: &[String], dest: &str) -> Result<String, St
 }
 
 fn download_one(url: &str, dest: &str) -> Result<u64, String> {
+    use std::io::IsTerminal;
+    let interactive = std::io::stdout().is_terminal();
     let agent = ureq::AgentBuilder::new()
         .timeout_connect(Duration::from_secs(20))
         .timeout(Duration::from_secs(600))
@@ -46,6 +48,7 @@ fn download_one(url: &str, dest: &str) -> Result<u64, String> {
     let mut f = File::create(dest).map_err(|e| format!("创建文件失败: {e}"))?;
     let mut buf = [0u8; 65536];
     let mut total = 0u64;
+    let mut next_mark = 8u64 * 1024 * 1024;
     loop {
         let n = reader.read(&mut buf).map_err(|e| format!("读取失败: {e}"))?;
         if n == 0 {
@@ -53,13 +56,16 @@ fn download_one(url: &str, dest: &str) -> Result<u64, String> {
         }
         f.write_all(&buf[..n]).map_err(|e| format!("写入失败: {e}"))?;
         total += n as u64;
-        if total % (8 * 1024 * 1024) < 65536 {
+        if interactive && total >= next_mark {
             print!("\r  已下载 {:.1} MB", total as f64 / 1048576.0);
             use std::io::Write as _;
             let _ = std::io::stdout().flush();
+            next_mark += 8 * 1024 * 1024;
         }
     }
-    println!();
+    if interactive {
+        println!();
+    }
     if total == 0 {
         let _ = std::fs::remove_file(dest);
         return Err("下载内容为空".to_string());
