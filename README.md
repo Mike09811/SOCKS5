@@ -27,16 +27,14 @@ sudo ./sk5-install --uninstall             # 卸载(内核保留)
 sudo ./sk5-install --status                # 查看 BBR / 服务 / 模块状态
 ```
 
-安装完成会打印 `socks5://user:pass@ip:port` 连接地址;装了新内核会提示 `reboot`。
+安装完成会打印 `socks5://user:pass@ip:port` 连接地址、**Telegram 一键添加代理链接**(`tg://socks?...`);装了新内核会提示 `reboot`。
 
-### 方式二:curl 一键安装
-
-先把仓库推到 GitHub 并发布 Release(见下文"构建与发布"),然后:
+### 方式二:curl 一键安装(推荐)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<你的用户名>/sk5/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Mike09811/SOCKS5/main/install.sh | sudo bash
 # 或带参数
-curl -fsSL .../install.sh | sudo bash -s -- --bbr native --port 1080
+curl -fsSL https://raw.githubusercontent.com/Mike09811/SOCKS5/main/install.sh | sudo bash -s -- --bbr native --port 1080
 ```
 
 没有发布 Release 时,可手动上传编译好的 `sk5-server` 后执行:
@@ -100,9 +98,8 @@ cross build --release --workspace --target x86_64-unknown-linux-musl
 
 **推荐:推送 tag 自动发布**。仓库自带 `.github/workflows/release.yml`:
 
-1. 把仓库推到 GitHub;
-2. 改两处占位符:安装器源码 `installer/src/sk5.rs` 里的 `DEFAULT_RELEASE_REPO` 与 `install.sh` 里的 `REPO`;
-3. `git tag v0.1.0 && git push --tags`,CI 会用 musl 静态编译 x86_64/aarch64 两个架构的 `sk5-server-*` 与 `sk5-install-*` 并挂到 Release。
+1. 仓库地址已内置(`Mike09811/SOCKS5`,在 `installer/src/sk5.rs` 与 `install.sh` 两处,换仓库时改这两处即可);
+2. `git tag v0.1.x && git push --tags`,CI 会用 musl 静态编译 x86_64/aarch64 两个架构的 `sk5-server-*` 与 `sk5-install-*` 并挂到 Release。
 
 之后 `install.sh` / `sk5-install` 默认下载地址即可直接工作,也可用 `--bin-url` 或环境变量 `SK5_BIN_URL` 覆盖。
 

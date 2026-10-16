@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # sk5 一键安装引导脚本:下载对应架构的 sk5-install 并执行,参数原样透传。
 # 用法:
-#   curl -fsSL https://raw.githubusercontent.com/Mike09811/sk5/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/Mike09811/SOCKS5/main/install.sh | sudo bash
 #   curl -fsSL … | sudo bash -s -- --bbr native --port 1080
 #
 # 仓库可用环境变量 SK5_REPO 覆盖。
 set -euo pipefail
 
-REPO="${SK5_REPO:-Mike09811/sk5}"
+REPO="${SK5_REPO:-Mike09811/SOCKS5}"
 
 main() {
     if [ "$(id -u)" != 0 ]; then

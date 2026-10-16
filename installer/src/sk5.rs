@@ -15,7 +15,7 @@ pub const SERVICE: &str = "sk5";
 
 /// sk5-server 默认从这个 GitHub 仓库的 Release 下载;
 /// 可用 --bin-url / 环境变量 SK5_BIN_URL 覆盖。
-pub const DEFAULT_RELEASE_REPO: &str = "Mike09811/sk5";
+pub const DEFAULT_RELEASE_REPO: &str = "Mike09811/SOCKS5";
 
 pub struct Sk5Info {
     pub port: u16,
@@ -187,8 +187,12 @@ fn firewall(ctx: &Ctx, port: u16) {
 
 pub fn uninstall(ctx: &Ctx) -> Result<(), String> {
     log::info("停止并移除 sk5 服务…");
-    exec::run_soft(ctx, "systemctl", &["disable", "--now", SERVICE, "sk5-bbrmod"]);
-    exec::run_soft(ctx, "systemctl", &["daemon-reload"]);
+    if Path::new("/run/systemd/system").exists() || ctx.dry_run {
+        exec::run_soft(ctx, "systemctl", &["disable", "--now", SERVICE, "sk5-bbrmod"]);
+        exec::run_soft(ctx, "systemctl", &["daemon-reload"]);
+    } else {
+        log::info("未检测到 systemd,直接删除文件");
+    }
     exec::remove_path(ctx, SERVICE_PATH);
     exec::remove_path(ctx, "/etc/systemd/system/sk5-bbrmod.service");
     exec::remove_path(ctx, BIN_PATH);
@@ -208,10 +212,7 @@ pub fn status_print() {
     log::plain(format!("系统      : {}({},{})", s.pretty, s.arch, s.virt));
     log::plain(format!("内核      : {}", s.kernel));
     log::plain(format!("拥塞控制  : {}", s.current_cc));
-    log::plain(format!(
-        "队列规则  : {}",
-        exec::probe("sysctl", &["-n", "net.core.default_qdisc"])
-    ));
+    log::plain(format!("队列规则  : {}", sys::current_qdisc()));
     log::plain(format!("可用算法  : {}", s.available_cc));
 
     let active = exec::probe("systemctl", &["is-active", SERVICE]);

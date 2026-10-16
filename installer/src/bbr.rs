@@ -91,11 +91,11 @@ fn native(ctx: &Ctx, sys: &SysInfo) -> Outcome {
     if !avail.split_whitespace().any(|s| s == "bbr") {
         if kernel_ge(&sys.kernel, 4, 9) {
             return Outcome::Skipped(
-                "当前内核 >= 4.9 但未找到可用的 tcp_bbr 模块(可尝试安装发行版更新的内核,或用 --bbr modbbr 换内核)".into(),
+                "当前内核 >= 4.9 但未找到可用的 tcp_bbr 模块(容器/共享内核环境需在宿主机启用;实体机安装发行版完整内核包后重启即可)".into(),
             );
         }
         return Outcome::Skipped(format!(
-            "当前内核 {} 低于 4.9,不支持原生 BBR(可尝试 --bbr modbbr 更换内核)",
+            "当前内核 {} 低于 4.9,不支持原生 BBR(老系统可用 --bbr modbbr 更换内核)",
             sys.kernel
         ));
     }
@@ -108,13 +108,21 @@ pub fn apply_sysctl(ctx: &Ctx, cc: &str) -> Outcome {
     if let Err(e) = exec::write_file(ctx, SYSCTL_CONF, &sysctl_conf(cc), None) {
         return Outcome::Skipped(format!("写入 sysctl 配置失败: {e}"));
     }
-    exec::run_soft(ctx, "sysctl", &["-w", "net.core.default_qdisc=fq"]);
-    exec::run_soft(ctx, "sysctl", &["-w", &format!("net.ipv4.tcp_congestion_control={cc}")]);
+    if !ctx.dry_run {
+        // 优先 sysctl 命令;没有 procps 或容器只读 /proc 时静默降级为直接写 /proc
+        if exec::have("sysctl") {
+            exec::run_soft(ctx, "sysctl", &["-w", "net.core.default_qdisc=fq"]);
+            exec::run_soft(ctx, "sysctl", &["-w", &format!("net.ipv4.tcp_congestion_control={cc}")]);
+        } else {
+            let _ = std::fs::write("/proc/sys/net/core/default_qdisc", "fq\n");
+            let _ = std::fs::write("/proc/sys/net/ipv4/tcp_congestion_control", format!("{cc}\n"));
+        }
+    }
     if ctx.dry_run {
         return Outcome::Applied("原生 BBR 配置完成(dry-run 预览)".into());
     }
-    let cur = exec::probe("sysctl", &["-n", "net.ipv4.tcp_congestion_control"]);
-    if cur.trim() == cc {
+    let cur = crate::sys::current_cc();
+    if cur == cc {
         Outcome::Applied(format!("原生 BBR 已启用(拥塞控制 = {cc},队列规则 = fq)"))
     } else {
         Outcome::Skipped(format!(

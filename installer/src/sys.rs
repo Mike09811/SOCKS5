@@ -95,16 +95,29 @@ pub fn detect() -> SysInfo {
         kernel: exec::probe("uname", &["-r"]),
         virt,
         is_container,
-        current_cc: exec::probe(
-            "sysctl",
-            &["-n", "net.ipv4.tcp_congestion_control"],
-        ),
+        current_cc: current_cc(),
         available_cc: std::fs::read_to_string("/proc/sys/net/ipv4/tcp_available_congestion_control")
             .unwrap_or_default()
             .trim()
             .to_string(),
         has_systemd: Path::new("/run/systemd/system").exists(),
     }
+}
+
+/// 当前拥塞控制算法:直接读 /proc,不依赖 sysctl 命令(procps)。
+pub fn current_cc() -> String {
+    std::fs::read_to_string("/proc/sys/net/ipv4/tcp_congestion_control")
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+/// 当前队列规则(同上,读 /proc)。
+pub fn current_qdisc() -> String {
+    std::fs::read_to_string("/proc/sys/net/core/default_qdisc")
+        .unwrap_or_default()
+        .trim()
+        .to_string()
 }
 
 #[cfg(test)]
