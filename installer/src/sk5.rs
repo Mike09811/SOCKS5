@@ -63,23 +63,25 @@ pub fn install(ctx: &Ctx, sys: &SysInfo, args: &Args) -> Result<Sk5Info, String>
 }
 
 fn install_binary(ctx: &Ctx, sys: &SysInfo, args: &Args) -> Result<(), String> {
+    // 先写 .new 再原子 rename:目标二进制正在运行时直接覆盖会报 Text file busy
+    let staging = format!("{BIN_PATH}.new");
     if let Some(src) = &args.sk5_bin {
         if src.starts_with("http://") || src.starts_with("https://") {
-            net::try_download(ctx, &[src.clone()], BIN_PATH)?;
+            net::try_download(ctx, &[src.clone()], &staging)?;
         } else if ctx.dry_run {
             log::plain(format!("  [dry-run] 复制 {src} -> {BIN_PATH}"));
         } else {
             if !Path::new(src).exists() {
                 return Err(format!("本地文件不存在: {src}"));
             }
-            std::fs::copy(src, BIN_PATH).map_err(|e| format!("复制 {src} 失败: {e}"))?;
+            std::fs::copy(src, &staging).map_err(|e| format!("复制 {src} 失败: {e}"))?;
         }
     } else {
         let url = std::env::var("SK5_BIN_URL")
             .ok()
             .or_else(|| args.bin_url.clone())
             .unwrap_or_else(|| default_bin_url(&sys.arch));
-        if let Err(e) = net::try_download(ctx, &[url], BIN_PATH) {
+        if let Err(e) = net::try_download(ctx, &[url], &staging) {
             return Err(format!(
                 "{e}\n下载 sk5-server 失败。可选解决方案:\n  1) 手动上传二进制后:sk5-install --sk5-bin /path/to/sk5-server\n  2) 指定下载地址:sk5-install --bin-url https://…/sk5-server-{}\n  3) 把编译好的 sk5-server 发布到自己的 GitHub Release,并设置环境变量 SK5_BIN_URL",
                 sys.arch
@@ -90,9 +92,11 @@ fn install_binary(ctx: &Ctx, sys: &SysInfo, args: &Args) -> Result<(), String> {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(BIN_PATH, std::fs::Permissions::from_mode(0o755))
+            std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o755))
                 .map_err(|e| format!("设置执行权限失败: {e}"))?;
         }
+        std::fs::rename(&staging, BIN_PATH)
+            .map_err(|e| format!("替换 {BIN_PATH} 失败: {e}"))?;
     }
     let ver = exec::probe(BIN_PATH, &["--version"]);
     if ver.contains("sk5-server") {

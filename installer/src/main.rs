@@ -185,11 +185,27 @@ fn banner() {
 }
 
 fn confirm(msg: &str) -> bool {
-    use std::io::BufRead;
+    use std::io::{BufRead, IsTerminal};
     println!("{msg} [y/N]");
+    // curl | bash 场景下 stdin 是管道(读不到用户输入),改从 /dev/tty 读取,
+    // 这样管道安装时确认提示仍能显示在终端上等待输入
     let mut line = String::new();
-    let stdin = std::io::stdin();
-    let n = stdin.lock().read_line(&mut line).unwrap_or(0);
+    let n = if std::io::stdin().is_terminal() {
+        let stdin = std::io::stdin();
+        stdin.lock().read_line(&mut line).unwrap_or(0)
+    } else {
+        match std::fs::File::open("/dev/tty") {
+            Ok(tty) => {
+                let mut tty = std::io::BufReader::new(tty);
+                tty.read_line(&mut line).unwrap_or(0)
+            }
+            Err(_) => {
+                log::plain("无法交互确认(无可用终端);管道安装请在命令末尾加 -- --yes,例如:");
+                log::plain("  curl -fsSL …/install.sh | sudo bash -s -- --yes");
+                0
+            }
+        }
+    };
     if n == 0 {
         return false;
     }
