@@ -1,11 +1,11 @@
 # sk5 — SOCKS5 代理 + 魔改 BBR 一键部署(Rust)
 
-一套纯 Rust 实现的 VPS 代理部署方案,包含两个部分:
+一套纯 Rust 实现的 VPS 代理部署方案(已在 **Debian 13** 上完整测试),包含两个部分:
 
 | 组件 | 说明 |
 |---|---|
 | **sk5-server** | 轻量 SOCKS5 代理服务端,单文件实现、**零第三方依赖**,支持用户名密码认证(RFC 1929)、IPv4/IPv6/域名目标 |
-| **sk5-install** | 一键安装器:自动检测系统 → 安装 BBR 加速(默认**魔改 BBR**,失败自动回退原生 BBR)→ 部署 sk5-server 并配置 systemd 开机自启 |
+| **sk5-install** | 一键安装器:自动检测系统 → 安装 BBR 加速(新系统自动用原生 BBR,老系统默认**魔改 BBR**,失败自动回退)→ 部署 sk5-server 并配置 systemd 开机自启 |
 
 ## 快速使用
 
@@ -45,6 +45,8 @@ sudo ./sk5-install --sk5-bin /root/sk5-server
 
 ## BBR 模式说明
 
+安装器按系统自动选择:**Debian 11/12/13、Ubuntu 20.04+ 等新系统内核已自带 BBR,自动启用原生 BBR(立即生效,无需重启,不动内核)**;老系统才走魔改内核方案。也可手动指定:
+
 | 模式 | 做法 | 生效方式 |
 |---|---|---|
 | `modbbr`(默认) | 安装 4.11.8 BBR 内核(经典 [cx9208/Linux-NetSpeed](https://github.com/cx9208/Linux-NetSpeed) 预编译包,多镜像回退),设为 GRUB 默认;部署 `sk5-bbrmod.service` 在**重启后**自动编译加载 `tcp_tsunami` 魔改算法模块 | 需重启 |
@@ -58,7 +60,7 @@ sudo ./sk5-install --sk5-bin /root/sk5-server
 - **开机兜底**:重启后先保证原生 bbr 生效,`sk5-bbrmod` 服务再尝试编译模块(含 `KCFLAGS=-fno-pie` 重试);编译/加载失败则保持原生 bbr,不会让机器失联;
 - 安装器会自动注释 `/etc/sysctl.conf` 里旧的拥塞控制配置,避免覆盖本次设置。
 
-**适用范围**:魔改内核包只有 `x86_64` 版,支持 Debian/Ubuntu 与 CentOS 7;容器/OpenVZ 无法换内核;较新的发行版(Debian 11+/Ubuntu 20+)内核年代久远,可能缺驱动或模块编不过——此时回退机制保证你仍拿到原生 BBR。求稳直接 `--bbr native`。
+**适用范围**:魔改内核包只有 `x86_64` 版,支持 Debian 8-10、Ubuntu 14-18 与 CentOS 7;容器/OpenVZ 无法换内核。Debian 11+ / Ubuntu 20.04+ 这类新系统安装器会**自动跳过老内核、直接启用原生 BBR**(老内核在新系统上可能无法引导);在老系统上任何环节失败也会自动回退原生 BBR。
 
 ## sk5-server 单独使用
 
